@@ -1,4 +1,5 @@
 require 'virtus'
+require 'rspec'
 
 module Die
   def roll
@@ -16,6 +17,12 @@ module Mortality
 end
 
 module LevelUp
+  def check_experience
+    if experience > next_level
+      level_up
+    end
+  end
+
   def level_up
     self.next_level *= 1.5
     self.next_level = next_level.to_i
@@ -26,18 +33,8 @@ module LevelUp
     puts "Level up! You're now level #{level}!"
   end
 
-  def check_experience
-    if experience > next_level
-      level_up
-    end
-  end
-
   def level_up_attack
-    upgraded_attack = attack.map {|e| (e * 1.35).to_i }
-    self.attack = (upgraded_attack.first .. upgraded_attack.last).to_a
-    # eventually range will get to big, check for it and shift a few
-    # out of the array, e.g.
-    # x.times { attack.shift }
+    self.damage_modifier += 0.05
   end
 
   def level_up_health
@@ -50,38 +47,59 @@ module LevelUp
 end
 
 module StandardAttack
-  def damage_inflicted # pick random damage from range
-    damage_origin = weapon.damage || base_damage # add clever nil handle if no weapon equiped
-    # don't call weapon damage, call the damage that gets modified by the weapon
-    # if it exists. so just damage, and have that be a proc that calculates the damage
-    # based off of weapon and some innate character damage modifier (this grows as char levels)
+  def damage_inflicted
     damage = attack.shuffle.first
     if (rand * 1000).to_i % 7 == 0
-      damage * 1.5
+      (damage * 1.5).to_i
     else
       damage
     end
   end
 end
 
-class Weapon; include Virtus; end
+class Weapon
+  include Virtus
+  def attack_damage(modifier)
+    Range.new(
+      *attack.split('-').values_at(0, -1).map {|lim| lim.to_i * modifier }.map(&:to_i)
+    ).to_a
+  end
+end
 class Sword < Weapon
   attribute :attack, String, :default => "5-7"
 end
+class Fists < Weapon
+  attribute :attack, String, :default => "1-2"
+end
 
-class Enemy
-  include Virtus, Mortality, Die, StandardAttack
+class BaseClass
+  include Virtus
 
   attribute :name, String
   attribute :health, Fixnum
   attribute :defense, Fixnum
-  attribute :attack, Array[Fixnum]
   attribute :hit_chance, Float, :default => 0.85
-  attribute :experience, Fixnum # added to hero's experience when killed
+  attribute :damage_modifier, Float, :default => 1.0
+  attribute :experience, Fixnum, :default => 0
+  attribute :weapon, Weapon, :default => Fists.new
+
+  def attack
+    weapon.attack_damage(damage_modifier)
+  end
+end
+
+class Enemy < BaseClass
+  include Virtus, Mortality, Die, StandardAttack
 
   # Enemy.instance_methods(false) gives instance methods
   # unique to the class. Randomly have one of these be 
   # selected in the choose_attack method?
+  # Enemy.instance_methods(false).reject{|a| a == :choose_attack }
+  def methods_array
+    self.class.instance_methods(false).
+      reject{|a| a == :choose_attack or a == :methods_array }
+  end
+
   def choose_attack(enemy)
     if roll > 3
       strike(enemy)
@@ -105,21 +123,52 @@ class Enemy
   end
 end
 
-class Hero
-  include Virtus, Mortality, Die, StandardAttack, LevelUp
+class String
+  def constantize
+    self.split("::").inject(Module) {|acc, val| acc.const_get(val) }
+  end
+end
 
-  attribute :name, String
-  attribute :health, Fixnum
-  attribute :defense, Fixnum
-  attribute :attack, Array[Fixnum] # change this to be the range caused by weapon + modifier or just base damage
-  attribute :weapon, Weapon, :default => nil
-  attribute :hit_chance, Float, :default => 0.85
-  attribute :experience, Fixnum, :default => 0
+module CharacterAttackProgression
+  # implement method_missing
+  def add_new_attacks
+    add_bash if level > 3
+    add_so_and_so if level > 5
+    add_so_and_so if level > 8
+    add_so_and_so if level > 10
+    add_so_and_so if level > 12
+  end
+
+  ############
+  #
+  # add attack modules to hero, e.g.
+  #
+  # add_bash
+  #
+  # add_slice
+  #
+  ############
+
+  def method_missing(method_name, *args)
+    match = method_name.to_s.match(/add_/)
+    # if method_name ~= /add_/
+    if match
+      extend method_name.slice(4..-1).camelize.constantize
+    else
+      super
+    end
+  end
+end
+
+class Hero < BaseClass
+  include Virtus, Mortality, Die, StandardAttack, LevelUp, CharacterAttackProgression
+
   attribute :next_level, Fixnum, :default => 10
   attribute :level, Fixnum, :default => 1
 
   attribute :in_battle, Boolean, :default => false
   attribute :current_enemies, Array[Enemy]
+
 
   # find modules included in class
   # can use this to find available moves
@@ -130,7 +179,7 @@ class Hero
   end
 
   def idle
-    if in_battle
+    if in_battle?
       puts "In battle with #{current_enemies_names}"
       print "Attack with what?\n" # print out fighting methods. namespace in module? list of attack methods on included modules?
       # namespace all attacks in an Attack module, then have separate modules for the different attacks
@@ -147,6 +196,7 @@ class Hero
       end
     else
       check_experience
+      add_new_attacks
       move
     end
   end
@@ -164,7 +214,7 @@ class Hero
         enemy_count = (rand * 3).to_i + 1
         enemy_array = []
         enemy_count.times do
-          enemy_array << Enemy.new(name: "Enemy", health: 20, defense: 100, attack: [3, 4, 5], experience: 15)
+          enemy_array << Enemy.new(name: "Enemy", health: 20, defense: 100, experience: 15)
         end # refactor into create_enemy_array method
         self.current_enemies = enemy_array
         self.in_battle = true
@@ -178,7 +228,7 @@ class Hero
   def current_enemies_names
     a = []
     current_enemies.each {|enemy| a << enemy.name }
-    a.last.insert(0, "and ") if a.length > 1 # didn't work when each enemy in array pointed to itself
+    a.last.insert(0, "and ") if a.length > 1
     a.join(", ")
   end
 
@@ -222,8 +272,8 @@ end
 # end
 
 # require './game.rb'
-# hero = Hero.new(name: "Hero", health: 100, defense: 100, attack: [5,6,7,8,9])
-# enemy = Enemy.new(name: "Enemy", health: 10, defense: 100, attack: [5,6,7,8,9])
+# hero = Hero.new(name: "Hero", health: 100, defense: 100, weapon: Sword.new)
+# enemy = Enemy.new(name: "Enemy", health: 10, defense: 100, weapon: Fists.new)
 # hero.current_enemies = [enemy, enemy, enemy]
 # hero2 = Hero.new(name: "other hero", health: 100, defense: 100, attack: 5)
 
@@ -233,5 +283,5 @@ end
 # sleep 0.5
 # puts "Hello, #{hero_name}! Prepare for an adventure!"
 # sleep 0.5
-# hero = Hero.new(name: "#{hero_name}", health: 100, defense: 100, attack: [5,6,7,8,9])
+# hero = Hero.new(name: "Hero", health: 100, defense: 100, weapon: Sword.new)
 # hero.idle
