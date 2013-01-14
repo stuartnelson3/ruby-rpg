@@ -5,6 +5,14 @@ module Die
   def roll
     (rand * 10).to_i
   end
+  # s is the number of sides
+  def self.dice(s)
+    Enumerator.new do |e|
+      loop do 
+        e.yield Random.rand(s) + 1
+      end
+    end
+  end
 end
 
 module Mortality
@@ -83,8 +91,17 @@ class BaseClass
   attribute :experience, Fixnum, :default => 0
   attribute :weapon, Weapon, :default => Fists.new
 
+  # work on having the level difference between the two enemies
+  # figure into damage reduction, hit chance, et c.
+  attribute :level, Fixnum, :default => 1
+
   def attack
     weapon.attack_damage(damage_modifier)
+  end
+
+  def physical_damage_reduction
+    # level_modifier = 100 * (level - 1)
+    1 - (defense.to_f - 1000)
   end
 end
 
@@ -94,31 +111,29 @@ class Enemy < BaseClass
   # Enemy.instance_methods(false) gives instance methods
   # unique to the class. Randomly have one of these be 
   # selected in the choose_attack method?
-  # Enemy.instance_methods(false).reject{|a| a == :choose_attack }
-  def methods_array
+  def fight_methods
     self.class.instance_methods(false).
-      reject{|a| a == :choose_attack or a == :methods_array }
+      reject{|a| a == :choose_attack || a == :fight_methods }
   end
 
   def choose_attack(enemy)
-    if roll > 3
-      strike(enemy)
-    else
-      cower
-    end
+    # picks random attack from array of methods available
+    # re-work to rand 1000 and weight certain attacks?
+    send(fight_methods.shuffle.first, enemy)
   end
 
   def strike(enemy)
     if rand < hit_chance
-      attack_damage = damage_inflicted
-      enemy.health -= attack_damage
+      attack_damage = damage_inflicted * enemy.physical_damage_reduction
+      enemy.health -= attack_damage.to_i
       puts "#{name} dealt #{attack_damage} to #{enemy.name}!"
       sleep 0.5
     else
       puts "#{name}'s attack missed!"
     end
   end
-  def cower
+
+  def cower(*_)
     puts "#{name} cowers in fear!"
   end
 end
@@ -130,7 +145,7 @@ class String
 end
 
 module CharacterAttackProgression
-  # implement method_missing
+
   def add_new_attacks
     add_bash if level > 3
     add_so_and_so if level > 5
@@ -150,13 +165,15 @@ module CharacterAttackProgression
   ############
 
   def method_missing(method_name, *args)
-    match = method_name.to_s.match(/add_/)
-    # if method_name ~= /add_/
-    if match
+    if method_name.to_s.start_with?('add_')
       extend method_name.slice(4..-1).camelize.constantize
     else
       super
     end
+  end
+
+  def respond_to_missing?(method_name, include_private = false)
+    method_name.to_s.start_with?('add_') || super
   end
 end
 
@@ -164,7 +181,6 @@ class Hero < BaseClass
   include Virtus, Mortality, Die, StandardAttack, LevelUp, CharacterAttackProgression
 
   attribute :next_level, Fixnum, :default => 10
-  attribute :level, Fixnum, :default => 1
 
   attribute :in_battle, Boolean, :default => false
   attribute :current_enemies, Array[Enemy]
@@ -186,6 +202,11 @@ class Hero < BaseClass
       # that way you can just target the namespace Attacks with the mixin_ancestors method
       # and list the available attacks that way
       # follow this pattern with Magic and other fight moves?
+
+      # find some way to get current list of methods for attack/defend
+      # including the extended videos
+      # list methods Hero.instance_methods.reject{ self.methods }
+      # self.methods.reject { Hero.instance_methods }
       response = gets.strip
       if current_enemies.length > 1
         print "Attack which enemy?\n" # print out number of monsters
