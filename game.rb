@@ -6,6 +6,8 @@ module Die
     (rand * 10).to_i
   end
   # s is the number of sides
+  # Die.dice(s).take(n) => n dice with s sides
+  # Die.dice(6).take(2) => [3, 6]
   def self.dice(s)
     Enumerator.new do |e|
       loop do 
@@ -207,6 +209,17 @@ class Hero < BaseClass
       # including the extended videos
       # list methods Hero.instance_methods.reject{ self.methods }
       # self.methods.reject { Hero.instance_methods }
+      # try using bitwise operators, &, |
+      # the methods that were added after the creation of the 
+      # class (the added attacks)
+      #
+      # should return the methods that have been added
+      # added_methods = hero.methods - hero.class.instance_methods
+
+      # then find the unique methods available to hero
+      # added_methods | self.class.instance_methods(false).
+      #   reject{|a| a == :undesired_methods }
+
       response = gets.strip
       if current_enemies.length > 1
         print "Attack which enemy?\n" # print out number of monsters
