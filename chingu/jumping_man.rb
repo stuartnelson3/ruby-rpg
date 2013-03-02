@@ -7,10 +7,12 @@ class Game < Chingu::Window
   def initialize
     super(640, 480, false)
 
+    @map = Map.new(self, "media/game_map.txt")
+
     @jm = JumpingMan.create(image: Image["jumping_man.png"])
     @jm.x = width / 2
     @jm.y = height - (@jm.height/2)
-    @jm.dy, @jm.dx = 0, 0
+    @jm.dy, @jm.dx, @jm.start_time = 0, 0, Time.now
     @jm.input = { :space => :jump,
                   :holding_left => :move_left,
                   :holding_right => :move_right }
@@ -20,21 +22,24 @@ class Game < Chingu::Window
 
   def draw
     fill(Color::WHITE)
+    @map.draw
     self.caption = "JM dy: #{@jm.dy}; JM y: #{@jm.y}"
     super
   end
 end
 
 # Map class holds and draws tiles and gems.
+module Tiles
+  Grass = 0
+  Earth = 1
+end
 class Map
+  include Gosu
   attr_reader :width, :height, :gems
   
   def initialize(window, filename)
     # Load 60x60 tiles, 5px overlap in all four directions.
     @tileset = Image.load_tiles(window, "media/CptnRuby Tileset.png", 60, 60, true)
-
-    gem_img = Image.new(window, "media/CptnRuby Gem.png", false)
-    @gems = []
 
     lines = File.readlines(filename).map { |line| line.chomp }
     @height = lines.size
@@ -47,7 +52,6 @@ class Map
         when '#'
           Tiles::Earth
         when 'x'
-          @gems.push(CollectibleGem.new(gem_img, x * 50 + 25, y * 50 + 25))
           nil
         else
           nil
@@ -69,7 +73,6 @@ class Map
         end
       end
     end
-    @gems.each { |c| c.draw }
   end
   
   # Solid at a given pixel position?
@@ -98,7 +101,6 @@ class JumpingMan < Chingu::GameObject
   attr_accessor :dy, :dx, :start_time
 
   def jump
-    # self.y -= 50
     self.dy = 20
     @start_time = Time.now
   end
@@ -112,11 +114,7 @@ class JumpingMan < Chingu::GameObject
   end
 
   def dt
-    if @start_time
-      Time.now - @start_time
-    else
-      0
-    end
+    Time.now - @start_time
   end
 
   def move_left
@@ -140,16 +138,17 @@ class JumpingMan < Chingu::GameObject
     super
 
     vert_decay
-    @y -= dy # d_vert_velocity
+    @y -= dy
     hori_decay
-    @x += dx # d_hori_velocity
+    @x += dx
+
     if grounded?
-      # self.dy *= -1
+      # self.dy *= -1 # bounce on impact
       @y = ($window.height - height/2)
     end
 
     if !@x.between?(0, $window.width)
-      self.dx *= -1
+      self.dx *= -1 # bounce on impact
     end
   end
 end
