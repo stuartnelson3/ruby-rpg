@@ -58,8 +58,8 @@ end
 
 module StandardAttack
   def damage_inflicted
-    damage = attack.shuffle.first
-    if (rand * 1000).to_i % 7 == 0
+    damage = attack.sample
+    if rand(1000) % 7 == 0
       (damage * 1.5).to_i
     else
       damage

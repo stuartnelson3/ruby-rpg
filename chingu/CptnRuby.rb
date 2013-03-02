@@ -35,20 +35,10 @@ end
 
 class CollectibleGem
   attr_reader :x, :y
-  attr_accessor :health
 
   def initialize(image, x, y)
     @image = image
     @x, @y = x, y
-    @health = 15
-  end
-
-  def health=(value)
-    @health = value
-  end
-
-  def health
-    @health
   end
   
   def draw
@@ -72,13 +62,11 @@ class CptnRuby
       # *Image.load_tiles(window, "media/CptnRuby.png", 50, 50, false)
     @standing, @walk_down1, @walk_down2, @standing_right, @walk_right1, @walk_right2, @standing_up, @walk_up1, @walk_up2 =
       *Image.load_tiles(window, "media/link_run_nowhite.png", 32, 32, false)
-    @attack_left3, @attack_left2, @attack_left1 =
-      *Image.load_tiles(window, "media/right_attack2.png", 56, 37, false)
-    @animation = [@attack_left1, @attack_left2, @attack_left3]
+    @attack_left1, @attack_left2, @attack_left3 =
+      *Image.load_tiles(window, "media/link_run_nowhite.png", 32, 32, false)
     # This always points to the frame that is currently drawn.
     # This is set in update, and used in draw.
-    @cur_image = @standing
-    @anim_time = 0.0
+    @cur_image = @standing    
   end
   
   def draw
@@ -132,23 +120,23 @@ class CptnRuby
     end
   end
   
-  def update(move_x = 0, move_y = 0)
-    if attacking?
-      not_attacking if @anim_time > 14.0
-      indices = [0] * 11 + [1] * 7 + [2] * 14
-      index = indices[milliseconds / 20 % indices.size]
-      @cur_image = @animation[index]
-      @anim_time += 1.0
-    elsif move_x == 0 && move_y == 0
+  def update(move_x, move_y)
+    # Select image depending on action
+    if move_x == 0 && move_y == 0
       @cur_image = sprite_still
+      # @cur_image = @standing
     else
+      # @cur_image = (milliseconds / 175 % 2 == 0) ? @walk_down1 : @walk_down2
       if (milliseconds / 175 % 2 == 0)
         @cur_image = sprite_move1
       else
         @cur_image = sprite_move2
       end
     end
-    
+    # if @vy < 0
+    #   @cur_image = @jump
+    # end
+    @window.caption = "#{move_y}, #{move_x}"
     # Directional walking, horizontal movement
     if move_x > 0
       @dir = :right
@@ -166,6 +154,18 @@ class CptnRuby
       @dir = :up
       move_y.times { @y -= 0.5 if would_fit(0, -1)}
     end
+
+    # Acceleration/gravity
+    # By adding 1 each frame, and (ideally) adding vy to y, the player's
+    # jumping curve will be the parabole we want it to be.
+    # @vy += 1
+    # # Vertical movement
+    # if @vy > 0 then
+    #   @vy.times { if would_fit(0, 1) then @y += 1 else @vy = 0 end }
+    # end
+    # if @vy < 0 then
+    #   (-@vy).times { if would_fit(0, -1) then @y -= 1 else @vy = 0 end }
+    # end
   end
   
   def try_to_jump
@@ -181,34 +181,12 @@ class CptnRuby
     end
   end
 
-  def damage
-    (5..10).to_a.shuffle.first
-  end
-
   def attack_gems(gems)
-    # gems.reject! do |c|
-    #   (c.x - @x).abs < 50 && (c.y - @y).abs < 40
-    # end
-    struck = gems.select do |g|
-              (g.x - @x).abs < 50 && (g.y - @y).abs < 40
-            end
-    struck.each {|struck_gem| struck_gem.health -= damage }
-    if struck.first
-      @window.caption = "#{struck.first.health}"
+    # Same as in the tutorial game.
+    gems.reject! do |c|
+
+      # (c.x - @x).abs < 50 and (c.y - @y).abs < 50
     end
-    struck.reject! {|g| g.health <= 0 }
-  end
-
-  def attacking?
-    @attacking == true
-  end
-
-  def attack
-    @attacking = true
-  end
-  def not_attacking
-    @attacking = false
-    @anim_time = 0.0
   end
 end
 
@@ -284,9 +262,8 @@ class Game < Window
     move_x += 5 if button_down? KbRight
     move_y -= 5 if button_down? KbDown
     move_y += 5 if button_down? KbUp
-    @cptn.attack if button_down? KbSpace
     @cptn.update(move_x, move_y)
-    @cptn.attack_gems(@map.gems) if @cptn.attacking?
+    @cptn.collect_gems(@map.gems)
     # Scrolling follows player
     @camera_x = [[@cptn.x - 320, 0].max, @map.width * 50 - 640].min
     @camera_y = [[@cptn.y - 240, 0].max, @map.height * 50 - 480].min
