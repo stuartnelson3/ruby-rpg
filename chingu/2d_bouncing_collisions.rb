@@ -11,9 +11,10 @@ class Game < Chingu::Window
     @ball = Ball.create(image: Image["circle.png"])
     @ball.diameter = 3 # cm
     @ball.density = 10 # g/cm^3; equivalent to 2 g/cm^3
-    @ball.x, @ball.y = width / 2, height / 2 # center of screen
+    # @ball.x, @ball.y = width / 2, height / 2 # center of screen
     # @ball.x, @ball.y = @ball.width/2, height - @ball.height/2 # lower left corner
     # @ball.x, @ball.y = @ball.width/2, height / 2 # halfway up left side of screen
+    @ball.x, @ball.y = rand(width), rand(height)
     @ball.dx, @ball.dy = 2, 3
 
     @ball2 = Ball.create(image: Image["circle.png"])
@@ -22,8 +23,22 @@ class Game < Chingu::Window
     # @ball.x, @ball.y = width / 2, height / 2 # center of screen
     # @ball2.x, @ball2.y = @ball.width/2, height - @ball.height/2 # lower left corner
     # @ball2.x, @ball2.y = @ball2.width/2, height / 2 # halfway up left side of screen
-    @ball2.x, @ball2.y = width / 2, height - @ball.height/2 # centered at bottom of screen
+    # @ball2.x, @ball2.y = width / 2, height - @ball.height/2 # centered at bottom of screen
+    @ball2.x, @ball2.y = rand(width), rand(height)
     @ball2.dx, @ball2.dy = -8, -5
+
+    @ball3 = Ball.create(image: Image["circle.png"])
+    @ball3.diameter = 3 # cm
+    @ball3.density = 15 # g/cm^3; equivalent to 2 g/cm^3
+    @ball3.x, @ball3.y = rand(width), rand(height)
+    @ball3.dx, @ball3.dy = -2, 4
+
+    @ball4 = Ball.create(image: Image["circle.png"])
+    @ball4.scale = 2
+    @ball4.diameter = 6 # cm
+    @ball4.density = 15 # g/cm^3; equivalent to 2 g/cm^3
+    @ball4.x, @ball4.y = rand(width), rand(height)
+    @ball4.dx, @ball4.dy = 8, 5
   end
 
 
@@ -38,7 +53,15 @@ class Game < Chingu::Window
     @ball.color = Color::RED
     @ball2.color = Color::RED
 
-    @ball.each_bounding_circle_collision(@ball2) do |b1, b2|
+    @ball.each_bounding_circle_collision(@ball2, @ball3, @ball4) do |b1, b2|
+      MomentumTransfer.calculate(b1, b2)
+    end
+
+    @ball2.each_bounding_circle_collision(@ball3, @ball4) do |b1, b2|
+      MomentumTransfer.calculate(b1, b2)
+    end
+
+    @ball3.each_bounding_circle_collision(@ball4) do |b1, b2|
       MomentumTransfer.calculate(b1, b2)
     end
 
@@ -104,6 +127,7 @@ class MomentumTransfer
 end
 
 class Ball < Chingu::GameObject
+  @@balls = []
   trait :collision_detection
   trait :bounding_circle, :debug => true
   attr_accessor :dx, :dy, :init_time
@@ -112,6 +136,7 @@ class Ball < Chingu::GameObject
 
   def initialize(*args)
     super
+    @@balls << self
     @init_time = Time.now
     cache_bounding_circle
   end
