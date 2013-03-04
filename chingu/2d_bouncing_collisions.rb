@@ -11,10 +11,10 @@ class Game < Chingu::Window
     @ball = Ball.create(image: Image["circle.png"])
     @ball.diameter = 3 # cm
     @ball.density = 10 # g/cm^3; equivalent to 2 g/cm^3
-    # @ball.x, @ball.y = width / 2, height / 2 # center of screen
-    @ball.x, @ball.y = @ball.width/2, height - @ball.height/2 # lower left corner
+    @ball.x, @ball.y = width / 2, height / 2 # center of screen
+    # @ball.x, @ball.y = @ball.width/2, height - @ball.height/2 # lower left corner
     # @ball.x, @ball.y = @ball.width/2, height / 2 # halfway up left side of screen
-    @ball.dx, @ball.dy = 5, 0
+    @ball.dx, @ball.dy = 2, 3
 
     @ball2 = Ball.create(image: Image["circle.png"])
     @ball2.diameter = 3 # cm
@@ -22,9 +22,10 @@ class Game < Chingu::Window
     # @ball.x, @ball.y = width / 2, height / 2 # center of screen
     # @ball2.x, @ball2.y = @ball.width/2, height - @ball.height/2 # lower left corner
     # @ball2.x, @ball2.y = @ball2.width/2, height / 2 # halfway up left side of screen
-    @ball2.x, @ball2.y = width / 2, height - @ball.height/2
-    @ball2.dx, @ball2.dy = 0, 0
+    @ball2.x, @ball2.y = width / 2, height - @ball.height/2 # centered at bottom of screen
+    @ball2.dx, @ball2.dy = -8, -5
   end
+
 
   def draw
     fill(Color::WHITE)
@@ -41,21 +42,9 @@ class Game < Chingu::Window
       MomentumTransfer.calculate(b1, b2)
     end
 
-    # doesn't work, fires for both balls and undoes the momentum transfer
-    # Ball.each_bounding_circle_collision(Ball) do |b1, b2|
-    #   old_b1, old_b2 = b1.dx, b2.dx
-    #   b1.dx = (b1.mass - b2.mass)/(b1.mass + b2.mass)*old_b1 + (2*b2.mass)/(b1.mass + b2.mass)*old_b2
-    #   b2.dx = (b2.mass - b1.mass)/(b2.mass + b1.mass)*old_b2 + (2*b1.mass)/(b2.mass + b1.mass)*old_b1
-    # end
-
     Ball.each_bounding_circle_collision(Ball) do |obj1, obj2|
       # MomentumTransfer.calculate(obj1, obj2)
-      # obj1.dx *= 1.2
       obj1.color = Color::BLUE
-      # if obj2.dx.abs > 0
-      #   obj1.dx = obj2.dx
-      #   obj2.dx = 0
-      # end
     end
   end
 end
@@ -106,6 +95,10 @@ class MomentumTransfer
       old_obj1_dx, old_obj2_dx = obj1.dx, obj2.dx
       obj1.dx = (obj1.mass - obj2.mass)/(obj1.mass + obj2.mass)*old_obj1_dx + (2*obj2.mass)/(obj1.mass + obj2.mass)*old_obj2_dx
       obj2.dx = (obj2.mass - obj1.mass)/(obj2.mass + obj1.mass)*old_obj2_dx + (2*obj1.mass)/(obj2.mass + obj1.mass)*old_obj1_dx
+
+      old_obj1_dy, old_obj2_dy = obj1.dy, obj2.dy
+      obj1.dy = (obj1.mass - obj2.mass)/(obj1.mass + obj2.mass)*old_obj1_dy + (2*obj2.mass)/(obj1.mass + obj2.mass)*old_obj2_dy
+      obj2.dy = (obj2.mass - obj1.mass)/(obj2.mass + obj1.mass)*old_obj2_dy + (2*obj1.mass)/(obj2.mass + obj1.mass)*old_obj1_dy
     end
   end
 end
@@ -170,12 +163,12 @@ class Ball < Chingu::GameObject
     self.x += dx
     self.dy *= -1 if at_vert_boundary?
     self.dx *= -1 if at_hori_boundary?
-    vert_decay
+    # vert_decay
     hori_decay
     calc_momentum
     if grounded?
     #   self.dy *= -1
-      self.y = $window.height - height/2
+      # self.y = $window.height - height/2
     end
   end
 end
