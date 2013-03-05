@@ -6,24 +6,43 @@ class Game < Chingu::Window
   def initialize
     super(800, 600, false, update_interval = 1) # calls update ever 1ms
     self.input = {[:q, :escape] => :exit}
-    2.times { Ball.create(image: Image["circle.png"])}
+    10.times { Ball.create(image: Image["circle.png"])}
   end
 
   def draw
     fill(Color::WHITE)
-    self.caption = "#{fps}"
+    self.caption = "#{Ball.all.count}"
     super
   end
 
   def update
     super
-    change_color = ->(x) {self.color = Color::RED}
-    Ball.balls.each {|ball| ball.instance_eval(&change_color)}
 
-    Ball.balls.each_with_index do |ball, index|
-      break if index == Ball.balls.count - 1
-      ball.each_bounding_circle_collision(Ball.balls[index + 1 .. -1]) do |b1, b2|
+    Ball.all.each_with_index do |ball, index|
+
+      set_color = ->(x) {self.color = Color::RED}
+      Ball.all.each {|ball| ball.instance_eval(&set_color)}
+
+      ball.consume_internal_ball
+      ball.in_boundaries.each do |invader|
+        invader.color = Color::BLACK
+      end
+
+      # calculate consume based on distance from surface
+      # not based on impact (well, impact also)
+
+      ball.scale == 5 if ball.scale > 5
+      break if index == Ball.all.count - 1
+      ball.each_bounding_circle_collision(Ball.all[index + 1 .. -1]) do |b1, b2|
+        [b1, b2].each {|b| b.color = Color::BLUE }
         MomentumTransfer.calculate(b1, b2)
+        scales = [b1, b2].sort {|b1, b2| b1.scale <=> b2.scale }
+        larger = scales.last
+        smaller = scales.first
+        transfer_rate = (0.1 * larger.scale)
+        larger.scale += transfer_rate
+        smaller.scale -= transfer_rate
+        smaller.destroy if smaller.scale <= 0
       end
     end
   end
@@ -88,7 +107,7 @@ class Ball < Chingu::GameObject
   trait :collision_detection
   trait :bounding_circle, :debug => true
   attr_accessor :dx, :dy, :init_time
-  attr_accessor :diameter, :density
+  attr_accessor :density
   attr_accessor :color, :momentum
 
   def initialize(*args)
@@ -96,15 +115,33 @@ class Ball < Chingu::GameObject
     @@balls << self
     @init_time = Time.now
     @x, @y = rand(width .. $window.width - width), rand(height .. $window.height - height)
-    @dx, @dy = rand(-10 .. 10), rand(-10 .. 10)
+    @dx, @dy = rand(-5 .. 5), rand(-5 .. 5)
     self.scale = rand(1..3)
-    @diameter = 3 * scale
     @density = 10
-    cache_bounding_circle
+    # cache_bounding_circle
   end
 
   def self.balls
     @@balls
+  end
+
+  def diameter
+    scale * 3
+  end
+
+  def consume_internal_ball
+    in_boundaries.each(&:destroy)
+  end
+
+  def other_balls
+    @@balls.reject {|b| b == self }
+  end
+
+  def in_boundaries
+    other_balls.select {|b| 
+      b.x.between?(x - radius, x + radius) &&
+       b.y.between?(y - radius, y + radius)
+     }
   end
 
   def recalc_dx
@@ -146,7 +183,7 @@ class Ball < Chingu::GameObject
     self.dy *= -1 if at_vert_boundary?
     self.dx *= -1 if at_hori_boundary?
     # vert_decay
-    # hori_decay
+    hori_decay
     # calc_momentum
   end
 end

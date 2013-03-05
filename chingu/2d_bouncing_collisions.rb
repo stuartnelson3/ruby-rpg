@@ -4,70 +4,27 @@ require 'gosu'
 class Game < Chingu::Window
   include Gosu
   def initialize
-    super(640, 480, false)
-
+    super(800, 600, false, update_interval = 1) # calls update ever 1ms
     self.input = {[:q, :escape] => :exit}
-
-    @ball = Ball.create(image: Image["circle.png"])
-    @ball.diameter = 3 # cm
-    @ball.density = 10 # g/cm^3; equivalent to 2 g/cm^3
-    # @ball.x, @ball.y = width / 2, height / 2 # center of screen
-    # @ball.x, @ball.y = @ball.width/2, height - @ball.height/2 # lower left corner
-    # @ball.x, @ball.y = @ball.width/2, height / 2 # halfway up left side of screen
-    @ball.x, @ball.y = rand(width), rand(height)
-    @ball.dx, @ball.dy = 2, 3
-
-    @ball2 = Ball.create(image: Image["circle.png"])
-    @ball2.diameter = 3 # cm
-    @ball2.density = 15 # g/cm^3; equivalent to 2 g/cm^3
-    # @ball.x, @ball.y = width / 2, height / 2 # center of screen
-    # @ball2.x, @ball2.y = @ball.width/2, height - @ball.height/2 # lower left corner
-    # @ball2.x, @ball2.y = @ball2.width/2, height / 2 # halfway up left side of screen
-    # @ball2.x, @ball2.y = width / 2, height - @ball.height/2 # centered at bottom of screen
-    @ball2.x, @ball2.y = rand(width), rand(height)
-    @ball2.dx, @ball2.dy = -8, -5
-
-    @ball3 = Ball.create(image: Image["circle.png"])
-    @ball3.diameter = 3 # cm
-    @ball3.density = 15 # g/cm^3; equivalent to 2 g/cm^3
-    @ball3.x, @ball3.y = rand(width), rand(height)
-    @ball3.dx, @ball3.dy = -2, 4
-
-    @ball4 = Ball.create(image: Image["circle.png"])
-    @ball4.scale = 2
-    @ball4.diameter = 6 # cm
-    @ball4.density = 15 # g/cm^3; equivalent to 2 g/cm^3
-    @ball4.x, @ball4.y = rand(width), rand(height)
-    @ball4.dx, @ball4.dy = 8, 5
+    10.times { Ball.create(image: Image["circle.png"])}
   end
-
 
   def draw
     fill(Color::WHITE)
-    self.caption = "Ball momentum: #{@ball.momentum}; Ball2 momentum: #{@ball2.momentum}"
+    self.caption = "#{fps}"
     super
   end
 
   def update
     super
-    @ball.color = Color::RED
-    @ball2.color = Color::RED
+    change_color = ->(x) {self.color = Color::RED}
+    Ball.balls.each {|ball| ball.instance_eval(&change_color)}
 
-    @ball.each_bounding_circle_collision(@ball2, @ball3, @ball4) do |b1, b2|
-      MomentumTransfer.calculate(b1, b2)
-    end
-
-    @ball2.each_bounding_circle_collision(@ball3, @ball4) do |b1, b2|
-      MomentumTransfer.calculate(b1, b2)
-    end
-
-    @ball3.each_bounding_circle_collision(@ball4) do |b1, b2|
-      MomentumTransfer.calculate(b1, b2)
-    end
-
-    Ball.each_bounding_circle_collision(Ball) do |obj1, obj2|
-      # MomentumTransfer.calculate(obj1, obj2)
-      obj1.color = Color::BLUE
+    Ball.balls.each_with_index do |ball, index|
+      break if index == Ball.balls.count - 1
+      ball.each_bounding_circle_collision(Ball.balls[index + 1 .. -1]) do |b1, b2|
+        MomentumTransfer.calculate(b1, b2)
+      end
     end
   end
 end
@@ -138,7 +95,16 @@ class Ball < Chingu::GameObject
     super
     @@balls << self
     @init_time = Time.now
+    @x, @y = rand(width .. $window.width - width), rand(height .. $window.height - height)
+    @dx, @dy = rand(-5 .. 5), rand(-5 .. 5)
+    self.scale = rand(1..3)
+    @diameter = 3 * scale
+    @density = 10
     cache_bounding_circle
+  end
+
+  def self.balls
+    @@balls
   end
 
   def recalc_dx
@@ -157,20 +123,11 @@ class Ball < Chingu::GameObject
     Time.now - @init_time
   end
 
-  def grounded?
-    @y >= $window.height - height/2
-  end
-
-  def airbourne?
-    !grounded?
-  end
-
   def vert_decay
      self.dy = VelocityDecay.vertical(dy, elapsed_time)
   end
 
   def hori_decay
-    modifier = airbourne? ? 1 : 0.95
     self.dx = VelocityDecay.horizontal(dx)
   end
 
@@ -190,11 +147,7 @@ class Ball < Chingu::GameObject
     self.dx *= -1 if at_hori_boundary?
     # vert_decay
     hori_decay
-    calc_momentum
-    if grounded?
-    #   self.dy *= -1
-      # self.y = $window.height - height/2
-    end
+    # calc_momentum
   end
 end
 

@@ -6,7 +6,40 @@ class Game < Chingu::Window
   def initialize
     super(800, 600, false, update_interval = 1) # calls update ever 1ms
     self.input = {[:q, :escape] => :exit}
-    2.times { Ball.create(image: Image["circle.png"])}
+    w, h = 160, 0
+    7.times { 
+      Ball.create(image: Image["circle.png"], x: w, y: height - 10 - h)
+      w += 20
+    }
+    w, h = 170, 18
+    6.times {
+      Ball.create(image: Image["circle.png"], x: w, y: height - 10 - h)
+      w += 20
+    }
+    w, h = 180, 18 * 2
+    5.times {
+      Ball.create(image: Image["circle.png"], x: w, y: height - 10 - h)
+      w += 20
+    }
+    w, h = 190, 18 * 3
+    4.times {
+      Ball.create(image: Image["circle.png"], x: w, y: height - 10 - h)
+      w += 20
+    }
+    i, j = 1, 4
+    [3, 2, 1].each do |num|
+      w, h = 190 + 10*i, 18 * j
+      i += 1
+      j += 1
+      num.times do
+        Ball.create(image: Image["circle.png"], x: w, y: height - 10 - h)
+        w += 20
+      end
+    end
+
+    @ball = Ball.create(image: Image["circle.png"])
+    @ball.x, @ball.y = 220, height/2
+    @ball.dx, @ball.dy = 0, 0
   end
 
   def draw
@@ -22,8 +55,9 @@ class Game < Chingu::Window
 
     Ball.balls.each_with_index do |ball, index|
       break if index == Ball.balls.count - 1
+      ball.color = Color::BLUE
       ball.each_bounding_circle_collision(Ball.balls[index + 1 .. -1]) do |b1, b2|
-        MomentumTransfer.calculate(b1, b2)
+        # MomentumTransfer.calculate(b1, b2)
       end
     end
   end
@@ -95,9 +129,9 @@ class Ball < Chingu::GameObject
     super
     @@balls << self
     @init_time = Time.now
-    @x, @y = rand(width .. $window.width - width), rand(height .. $window.height - height)
-    @dx, @dy = rand(-10 .. 10), rand(-10 .. 10)
-    self.scale = rand(1..3)
+    # @x, @y = rand(width .. $window.width - width), rand(height .. $window.height - height)
+    @dx, @dy = 0, 0 # rand(-10 .. 10), rand(-10 .. 10)
+    self.scale = 1 # rand(1..3)
     @diameter = 3 * scale
     @density = 10
     cache_bounding_circle
@@ -123,6 +157,18 @@ class Ball < Chingu::GameObject
     Time.now - @init_time
   end
 
+  def grounded?
+    @y >= $window.height - height/2
+  end
+
+  # def occupied?
+  #   coords = @@balls.map {|ball| ball.x, ball.y }
+  #   r = height / 2
+  #   x + r, x - r
+  #   y + r, y - r
+  #   coords.include? [x, y]
+  # end
+
   def vert_decay
      self.dy = VelocityDecay.vertical(dy, elapsed_time)
   end
@@ -146,7 +192,8 @@ class Ball < Chingu::GameObject
     self.dy *= -1 if at_vert_boundary?
     self.dx *= -1 if at_hori_boundary?
     # vert_decay
-    # hori_decay
+    hori_decay
+    self.y = $window.height - height/2 if grounded?
     # calc_momentum
   end
 end

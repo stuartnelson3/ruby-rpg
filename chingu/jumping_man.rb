@@ -20,6 +20,9 @@ class Game < Chingu::Window
 
   def draw
     fill(Color::WHITE)
+    draw_circle(width/2 , height/2, 100, Color::RED)
+    # fill_circle(width/2 , height/2, 100, Color::RED)
+    # fill_arc(width/2 , height/2, 100, Color::RED)
     self.caption = "JM dy: #{@jm.dy}; JM y: #{@jm.y}"
     super
   end
